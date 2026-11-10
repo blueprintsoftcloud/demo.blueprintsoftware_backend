@@ -14,9 +14,13 @@ export const connectDB = async (): Promise<void> => {
       throw new Error("MONGO_URL environment variable is required");
     }
 
-    await mongoose.connect(url);
+    await mongoose.connect(url, {
+      retryWrites: true,
+      w: "majority",
+    });
     logger.info(`✅ MongoDB connected to DB: ${mongoose.connection.name}`);
   } catch (err) {
+    console.log("❌ Database connection failed:", err);
     logger.error("❌ Database connection failed", err);
     process.exit(1);
   }

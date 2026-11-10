@@ -7,11 +7,13 @@ import { z } from "zod";
 import dotenv from "dotenv";
 import path from "path";
 
-// Always load .env from the project root.
-// In source this is ../../.env, and in compiled dist this is also ../../.env.
+// Load .env from process.cwd() or fallback to relative paths
+dotenv.config();
+dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 dotenv.config({ path: path.resolve(__dirname, "../../.env") });
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
- console.log(".env loads");
+console.log(".env loads");
 
 const envSchema = z.object({
   NODE_ENV: z
@@ -34,14 +36,25 @@ const envSchema = z.object({
   // (Previously also the SMTP account address; email now sends via MSG91, see below.)
   EMAIL_USER: z.string().default("unaiznoushad105@gmail.com"),
 
-  // Cloudinary
-  CLOUDINARY_CLOUD_NAME: z.string().min(1, "CLOUDINARY_CLOUD_NAME is required"),
-  CLOUDINARY_API_KEY: z.string().min(1, "CLOUDINARY_API_KEY is required"),
-  CLOUDINARY_API_SECRET: z.string().min(1, "CLOUDINARY_API_SECRET is required"),
+  // Storage Provider: "r2" (Cloudflare R2 - recommended) or "cloudinary"
+  STORAGE_PROVIDER: z.enum(["r2", "cloudinary"]).default("cloudinary"),
+
+  // Cloudflare R2 (10GB free, unlimited zero-cost egress)
+  R2_ACCOUNT_ID: z.string().default(""),
+  R2_ACCESS_KEY_ID: z.string().default(""),
+  R2_SECRET_ACCESS_KEY: z.string().default(""),
+  R2_BUCKET_NAME: z.string().default(""),
+  R2_PUBLIC_DOMAIN: z.string().default(""),
+
+  // Cloudinary (legacy)
+  CLOUDINARY_CLOUD_NAME: z.string().default(""),
+  CLOUDINARY_API_KEY: z.string().default(""),
+  CLOUDINARY_API_SECRET: z.string().default(""),
 
   // Razorpay — storefront e-commerce checkout
   RAZORPAY_KEY_ID: z.string().min(1, "RAZORPAY_KEY_ID is required"),
   RAZORPAY_KEY_SECRET: z.string().min(1, "RAZORPAY_KEY_SECRET is required"),
+  RAZORPAY_WEBHOOK_SECRET: z.string().default(""),
 
   // MSG91 Mobile OTP (SMS widget) — MSG91_AUTH_KEY is the account-wide key, also
   // used to authenticate the Email API calls below.
@@ -83,8 +96,9 @@ const envSchema = z.object({
 const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
-  console.error("\n❌ Invalid or missing environment variables:\n");
   const errors = parsed.error.flatten().fieldErrors;
+  console.log("❌ ENV VALIDATION FAILED! Missing or invalid fields:", JSON.stringify(errors));
+  console.error("\n❌ Invalid or missing environment variables:\n");
   Object.entries(errors).forEach(([key, messages]) => {
     console.error(`  ${key}: ${messages?.join(", ")}`);
   });
@@ -92,4 +106,5 @@ if (!parsed.success) {
   process.exit(1);
 }
 
+console.log("✅ Environment variables validated successfully");
 export const env = parsed.data;

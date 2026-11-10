@@ -1,3 +1,4 @@
+// Storra E-Commerce Server
 import express from "express";
 import http from "http";
 import { Server } from "socket.io";
@@ -116,11 +117,13 @@ app.use(
 
 
 process.on('uncaughtException', (err) => {
+  console.log('❌ UNCAUGHT EXCEPTION:', err?.message || err);
   console.error('UNCAUGHT EXCEPTION:', err);
   process.exit(1);
 });
 
 process.on('unhandledRejection', (reason) => {
+  console.log('❌ UNHANDLED REJECTION:', reason);
   console.error('UNHANDLED REJECTION:', reason);
   process.exit(1);
 });
@@ -129,7 +132,13 @@ process.on('unhandledRejection', (reason) => {
 // Trust the nginx reverse proxy so that express-rate-limit can read the real
 // client IP from X-Forwarded-For without throwing ERR_ERL_UNEXPECTED_X_FORWARDED_FOR.
 app.set("trust proxy", 1);
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 app.use(cookieParser());
 app.use(ensureCsrfCookie);
 
@@ -243,8 +252,12 @@ app.use(errorHandler);
 // the process if it's still waiting on a slow first Mongo connection. Mongoose
 // buffers queries by default, so requests that arrive before the connection is
 // ready simply wait rather than error.
-const PORT = Number(env.PORT ?? 5000);
-server.listen(PORT, "0.0.0.0", () => {
+const PORT = process.env.PORT || env.PORT || 5000;
+server.on("error", (err: any) => {
+  console.log(`❌ Server listen error on port ${PORT}:`, err?.message || err);
+  process.exit(1);
+});
+server.listen(PORT, () => {
   console.log(`Server running on PORT ${PORT}`);
 });
 
@@ -255,6 +268,7 @@ connectDB()
     startHealthMonitor();
   })
   .catch((error) => {
+    console.log("❌ Critical startup error connecting to MongoDB:", error?.message || error);
     console.error("Critical startup error:", error);
     process.exit(1);
   });
